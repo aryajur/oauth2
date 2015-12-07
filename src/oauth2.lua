@@ -214,7 +214,7 @@ local function refreshToken(self)
 		grant_type = 'refresh_token',
 		refresh_token = self.tokens.refresh_token,
 	}
-	updateToken(self,params)
+	return updateToken(self,params)
 end
 
 local function request(self, url, payload, headers, verb, options)
@@ -328,9 +328,9 @@ function new(config)
 		end
 	end
 	if config.tokens_file and file_exists(config.tokens_file) then
-		stat,msg,msg2 = pcall(load_JSON_File,config.tokens_file)
+		stat,msg,msg2 = pcall(load_JSON_file,config.tokens_file)
 		if not stat then
-			return nil,"Error loading credientials file: "..config.tokens_file.." "..msg
+			return nil,"Error loading tokens file: "..config.tokens_file.." "..msg
 		end
 		if msg then
 			obj.tokens = msg

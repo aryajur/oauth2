@@ -39,7 +39,7 @@ config = {
 	-- workaround missing trusted certificates in cURL/PolarSSL on OpenWRT
 	curl_options = {ssl_verifypeer = 0},
 }
-local oagdrive,msg = oauth2.new(config)
+oagdrive,msg = oauth2.new(config)
 if oagdrive then
 	local status
 	status, msg = oagdrive:acquireToken()
@@ -53,6 +53,25 @@ if oagdrive then
 			print("Code authorization failed: "..msg)
 		else
 			print('Token acquired successfully.')
+			print('Now trying the refresh token code.')
+			-- Get the refresh token function
+			local t = debug.getinfo(oagdrive.request)
+			local name,func,refreshToken
+			for i = 1,t.nups do
+				name,func = debug.getupvalue(oagdrive.request,i)
+				if name == "refreshToken" then
+					refreshToken = func
+					break
+				end
+			end
+			assert(refreshToken,"refreshToken function not found in the upvalues of the request function")
+			stat,msg = refreshToken(oagdrive)
+			if not stat then
+				print("Token refresh failed: "..msg)
+			else
+				print("Token refreshed successfully.")
+			end
+			os.remove(oagdrive.config.tokens_file)
 		end
 	else
 		print('Acquisition failed: ' .. msg)
