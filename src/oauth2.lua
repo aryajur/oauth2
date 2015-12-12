@@ -3,7 +3,6 @@ local url = require 'net.url'
 local json = require 'json'
 local curl = require 'cURL'
 
-
 local type = type
 local pcall = pcall
 local io = io
@@ -228,7 +227,7 @@ local function request(self, url, payload, headers, verb, options)
 		-- Token has expired
 		refreshToken(self) 
 	end
-	local tmp = string.format('Authorization: %s %s', self.tokens.token_type, self.tokens.access_token)
+	local tmp = "Authorization: "..self.tokens.token_type.." "..self.tokens.access_token
 	headers = headers or {}
 	table.insert(headers, tmp)
 	options = options or {}
