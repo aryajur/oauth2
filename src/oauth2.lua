@@ -1,7 +1,20 @@
 -- OAuth 2.0 module for Lua 5.2+
 local url = require 'net.url'
 local json = require 'json'
-local curl = require 'cURL'
+
+local USE_SOCKET = true		-- If false will use curl
+
+local curl, CURL_SSL_VERIFYPEER, socket, https, ltn12
+if not USE_SOCKET then
+	curl = require 'cURL'
+	-- workaround missing trusted certificates in cURL/PolarSSL on OpenWRT
+	CURL_SSL_VERIFYPEER = 0
+else
+	socket = require 'socket'
+	ssl = require 'ssl'
+	https = require 'ssl.https'
+	ltn12 = require 'ltn12'
+end
 
 local type = type
 local pcall = pcall
@@ -13,6 +26,8 @@ local table = table
 local setmetatable = setmetatable
 local getmetatable = getmetatable
 local pairs = pairs
+
+--local print = print
 
 -- Create the module table here
 local M = {}
@@ -81,18 +96,86 @@ local function save_JSON_file(name, content)
 	return save_file(name, ret)
 end
 
+local function socketRequest(uri,payload,headers,method)
+--[[
+http.request(url [, body])
+http.request{
+  url = string,
+  [sink = LTN12 sink,]
+  [method = string,]
+  [headers = header-table,]
+  [source = LTN12 source],
+  [step = LTN12 pump step,]
+  [proxy = string,]
+  [redirect = boolean,]
+  [create = function]
+}
+default = {
+  protocol = "tlsv1",
+  options = "all",
+  verify = "none",
+}
+]]
+	local sink,output = ltn12.sink.table()
+	local source 
+	headers = headers or {}
+	if payload and type(payload) == "string" then
+		source = ltn12.source.simplify(ltn12.source.string(payload))
+		if not headers["content-length"] then
+			headers["content-length"] = tostring(#payload)
+		end
+	elseif payload and type(payload) == "function" then
+		-- Handle a source function here
+	elseif payload and type(payload) == "table" then
+		-- application/x-www-form-urlencoded encoding so make sure the header is there
+		-- Now encode the payload
+		local u = url.parse("")
+		for k,v in pairs(payload) do
+			u.query[k] = v
+		end
+		source = ltn12.source.simplify(ltn12.source.string(tostring(u.query)))
+		if not headers["content-length"] then
+			headers["content-length"] = tostring(#tostring(u.query))
+		end
+		if not headers["content-type"] then
+			headers["content-type"] = "application/x-www-form-urlencoded"
+		end
+	end
+	if payload and not method then
+		method = "POST"
+	end
+	local one, code, headers, status = https.request {
+	  url = tostring(uri),
+	  sink = sink,
+	  source = source,
+	  method = method,
+	  headers = headers,
+	  protocol = "tlsv1",
+	  options = "all",
+	  verify = "none",
+	}	
+	return table.concat(output), code
+end
+
 -- Only function using CURL (Should replace it with LuaSocket)
-local function httpRequest(url, payload, headers, verb, options)
+local function curlRequest(url, payload, headers, verb)
 	local c = curl.easy_init()
 	c:setopt_url(tostring(url))
-	if options and options['ssl_verifypeer'] ~= nil then	-- Normally set ssl_verifypeer = 0
-		c:setopt_ssl_verifypeer(options['ssl_verifypeer'])
-	end
+	--c:setopt_verbose(true)
+	--if options and options['ssl_verifypeer'] ~= nil then	-- Normally set ssl_verifypeer = 0
+	--	c:setopt_ssl_verifypeer(options['ssl_verifypeer'])
+	--end
+	c:setopt_ssl_verifypeer(CURL_SSL_VERIFYPEER)
 	if verb then
 		c:setopt_customrequest(verb)
 	end
 	if headers then
-		c:setopt_httpheader(headers)
+		local h = {}
+		-- Translate the socket compatible headers table to the curl headers
+		for k,v in pairs(headers) do
+			h[#h + 1] = k..": "..tostring(v)
+		end
+		c:setopt_httpheader(h)
 	end
 	if payload and type(payload) == 'table' then
 		c:post(payload)
@@ -113,6 +196,13 @@ local function httpRequest(url, payload, headers, verb, options)
 			code = tonumber(data:match('^[^ ]+ ([0-9]+) '))
 		end}
 	return table.concat(output), code
+end
+
+local httpRequest
+if USE_SOCKET then
+	httpRequest = socketRequest
+else
+	httpRequest = curlRequest
 end
 
 local function validateOauth(o)
@@ -189,9 +279,9 @@ local function updateToken(self,params)
 	params.client_id = self.creds.client_id
 	params.client_secret = self.creds.client_secret
 
-	local content, code = httpRequest(self.config.token_uri or self.config.token_url, params, nil, nil, self.config.curl_options)
+	local content, code = httpRequest(self.config.token_uri or self.config.token_url, params)
 	if code ~= 200 then 
-		return nil,'Bad http response code: '..tostring(code)
+		return nil,'Bad http response code: '..tostring(code),content
 	end
 
 	local resp = json.decode(content)
@@ -216,7 +306,7 @@ local function refreshToken(self)
 	return updateToken(self,params)
 end
 
-local function request(self, url, payload, headers, verb, options)
+local function request(self, url, payload, headers, verb)
 	if getmetatable(self) ~= identifier then
 		return nil,"Invalid OAuth object"
 	end
@@ -227,12 +317,13 @@ local function request(self, url, payload, headers, verb, options)
 		-- Token has expired
 		refreshToken(self) 
 	end
-	local tmp = "Authorization: "..self.tokens.token_type.." "..self.tokens.access_token
+	--local tmp = "Authorization: "..self.tokens.token_type.." "..self.tokens.access_token
 	headers = headers or {}
-	table.insert(headers, tmp)
-	options = options or {}
-	copyTable(self.config.curl_options, options)
-	return httpRequest(url, payload, headers, verb, options)
+	headers.Authorization = self.tokens.token_type.." "..self.tokens.access_token
+	--table.insert(headers, tmp)
+	--options = options or {}
+	--copyTable(self.config.curl_options, options)
+	return httpRequest(url, payload, headers, verb)
 end
 
 -- Returns the parsed URL as a table

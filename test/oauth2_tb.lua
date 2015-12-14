@@ -1,6 +1,8 @@
 -- Oauth2 test file for google drive
---require("subModSearcher") --My module to update the package searchers to find sub-modules
+require("debugUtil") --Debug utilities and add searchers to find lua modules
 local oauth2 = require 'oauth2'
+
+-- For Google drive
 
 config = {
 	auth_url = 'https://accounts.google.com/o/oauth2/auth',
@@ -36,9 +38,44 @@ config = {
 	}
 	--[ Creds Block ends ]]
 	tokens_file = 'tokens.json',
-	-- workaround missing trusted certificates in cURL/PolarSSL on OpenWRT
-	curl_options = {ssl_verifypeer = 0},
 }
+
+-- For Amazon cloud drive
+-- config = {
+	-- auth_uri = "https://www.amazon.com/ap/oa",
+	-- token_url = "https://api.amazon.com/auth/o2/token",
+
+	-- approval_prompt = 'force',
+	-- access_type = 'offline',
+	-- --redirect_uri = 'urn:ietf:wg:oauth:2.0:oob',	-- Not needed if the creds table or creds_file has a table of redirect_uris
+	-- scope = 'clouddrive:write', 
+	-- creds_file = [[D:\Milind\Documents\credsamzn.json]], 	-- Place the creds file if the file is used 
+	-- -- Sample creds.json:
+	-- --[[
+	-- {
+		-- "client_id":"CLIENT ID STRING",
+		-- "auth_uri":"https://accounts.google.com/o/oauth2/auth",
+		-- "token_uri":"https://accounts.google.com/o/oauth2/token",
+		-- "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
+		-- "client_secret":"CLIENT SECRET STRING",
+		-- "redirect_uris":["urn:ietf:wg:oauth:2.0:oob","http://localhost"]
+	-- }
+	-- ]]
+	-- --[[ Use this block if creds.json file is not used,add the client id and secret  ]
+	-- creds = {
+		-- client_id = "CLIENT ID STRING",
+		-- auth_uri = "https://accounts.google.com/o/oauth2/auth",
+		-- token_uri = "https://accounts.google.com/o/oauth2/token",
+		-- ["auth_provider_x509_cert_url"] = "https://www.googleapis.com/oauth2/v1/certs",
+		-- client_secret = "CLIENT SECRET STRING",
+		-- redirect_uris = {
+			-- "urn:ietf:wg:oauth:2.0:oob",
+			-- "http://localhost"
+		-- }
+	-- }
+	-- --[ Creds Block ends ]]
+	-- tokens_file = 'tokens.json',
+-- }
 oagdrive,msg = oauth2.new(config)
 if oagdrive then
 	local status
