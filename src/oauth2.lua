@@ -144,6 +144,13 @@ default = {
 	if payload and not method then
 		method = "POST"
 	end
+	--[[
+	print("URL: ",tostring(uri))
+	print("HEADERS: ")
+	for k,v in pairs(headers) do
+		print(k..":"..v)
+	end
+	print("BODY: ",payload)]]
 	local one, code, headers, status = https.request {
 	  url = tostring(uri),
 	  sink = sink,
@@ -287,7 +294,11 @@ local function updateToken(self,params)
 	local resp = json.decode(content)
 	self.tokens = self.tokens or {}
 	self.tokens.access_token = resp.access_token
-	self.tokens.token_type = resp.token_type
+	if resp.token_type == "bearer" then
+		self.tokens.token_type = "Bearer"
+	else
+		self.tokens.token_type = resp.token_type
+	end
 	if resp.refresh_token then
 		self.tokens.refresh_token = resp.refresh_token
 	end
