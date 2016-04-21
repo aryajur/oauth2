@@ -4,14 +4,12 @@ local json = require 'json'
 
 local USE_SOCKET = true		-- If false will use curl
 
-local curl, CURL_SSL_VERIFYPEER, socket, https, ltn12
+local curl, CURL_SSL_VERIFYPEER, https, ltn12
 if not USE_SOCKET then
 	curl = require 'cURL'
 	-- workaround missing trusted certificates in cURL/PolarSSL on OpenWRT
 	CURL_SSL_VERIFYPEER = 0
 else
-	socket = require 'socket'
-	ssl = require 'ssl'
 	https = require 'ssl.https'
 	ltn12 = require 'ltn12'
 end
