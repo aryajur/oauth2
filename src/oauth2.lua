@@ -149,7 +149,7 @@ default = {
 		print(k..":"..v)
 	end
 	print("BODY: ",payload)]]
-	local one, code, headers, status = https.request {
+	local one, code, hdrs, status = https.request {
 	  url = tostring(uri),
 	  sink = sink,
 	  source = source,
@@ -162,7 +162,7 @@ default = {
 	return table.concat(output), code
 end
 
--- Only function using CURL (Should replace it with LuaSocket)
+-- Only function using CURL 
 local function curlRequest(url, payload, headers, verb)
 	local c = curl.easy_init()
 	c:setopt_url(tostring(url))
@@ -238,6 +238,18 @@ local function validateOauth(o)
 			o.config.redirect_uri = o.creds.redirect_uris[1]
 		end
 	end
+	if o.creds.auth_uri or o.creds.auth_url then
+		o.config.auth_uri = o.creds.auth_uri or o.creds.auth_url
+	end
+	if o.creds.token_uri or o.creds.token_url then
+		o.config.token_uri = o.creds.token_uri or o.creds.token_url
+	end
+	if not o.config.token_uri and not o.config.token_url then
+		return nil,"OAuth configuration and credentials file do not have a token URL."
+	end
+	if not o.config.auth_uri and not o.config.auth_url then
+		return nil,"OAuth configuration and credentials file do not have a auth URL."
+	end	
 	return true
 end
 
@@ -256,17 +268,17 @@ local function validateConfig(config)
 	if (config.tokens and type(config.tokens) ~= "table") then 
 		return nil,"The configuration tokens should be a table"
 	end
-	if not config.auth_uri and not config.auth_url or (config.auth_uri and type(config.auth_uri) ~= "string") or
+	if (config.auth_uri and type(config.auth_uri) ~= "string") or
 	  (config.auth_url and type(config.auth_url) ~= "string") then
-		return nil,"The configuration needs to have a authorization URI string"
+		return nil,"The configuration authorization URI should be a string"
 	end
 	if (config.redirect_uri or config.redirect_url) and ((config.redirect_uri and type(config.redirect_uri) ~= "string") or
 	  (config.redirect_url and type(config.redirect_url) ~= "string")) then
 		return nil,"The redirect_uri if given should be a string."
 	end
-	if not config.token_uri and not config.token_url or (config.token_uri and type(config.token_uri) ~= "string") or
+	if (config.token_uri and type(config.token_uri) ~= "string") or
 	  (config.token_url and type(config.token_url) ~= "string") then
-		return nil,"The configuration needs to have a token URI string"
+		return nil,"The configuration token URI should be a string"
 	end
 	if config.scope and type(config.scope) ~= "string" then
 		return nil,"The scope if given should be a string."
@@ -319,10 +331,10 @@ local function request(self, url, payload, headers, verb)
 	if getmetatable(self) ~= identifier then
 		return nil,"Invalid OAuth object"
 	end
-	if not self.tokens then 
-		return nil,"Access token not acquired yet. Run obj:aquireToken()"
+	if not self.tokens or not self.tokens.refresh_token then 
+		return nil,"Access token not acquired yet or token not proper. Run obj:aquireToken()"
 	end
-	if os.time() >= self.tokens.expires	then 
+	if not self.tokens.expires or os.time() >= self.tokens.expires	then 
 		-- Token has expired
 		refreshToken(self) 
 	end
@@ -374,7 +386,7 @@ end
 -- * creds_file (OPT this or creds) - Local path to the credentials json file. This file is loaded with all its elemets entered in the configuration
 -- * tokens_file (OPT) - Local path to the tokens file previously obtained for the same connection. If not given the the acquired tokens will not be saved locally
 -- * creds (OPT this or creds_file) - The credentials table for the OAuth object. Either this or the creds_file should be given
--- * tokens (OPT) - The tokens table for the OAuth object. 
+-- * tokens (OPT) - The tokens table for the OAuth object. If neither this nor the tokens file is given then the towkn is obtained by providing the link to follow.
 -- * scope (OPT) - Scope of the access
 -- * redirect_uri or redirect_url (OPT)
 -- * access_type (OPT)

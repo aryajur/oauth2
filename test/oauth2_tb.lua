@@ -1,5 +1,5 @@
 -- Oauth2 test file for google drive
-require("debugUtil") --Debug utilities and add searchers to find lua modules
+--require("debugUtil") --To add paths to search modules
 local oauth2 = require 'oauth2'
 
 -- For Google drive
@@ -50,30 +50,6 @@ config = {
 	--redirect_uri = 'urn:ietf:wg:oauth:2.0:oob',	-- Not needed if the creds table or creds_file has a table of redirect_uris
 	scope = 'clouddrive:read_all clouddrive:write', 
 	creds_file = [[D:\Milind\Documents\credsamzn.json]], 	-- Place the creds file if the file is used 
-	-- Sample creds.json:
-	--[[
-	{
-		"client_id":"CLIENT ID STRING",
-		"auth_uri":"https://accounts.google.com/o/oauth2/auth",
-		"token_uri":"https://accounts.google.com/o/oauth2/token",
-		"auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
-		"client_secret":"CLIENT SECRET STRING",
-		"redirect_uris":["urn:ietf:wg:oauth:2.0:oob","http://localhost"]
-	}
-	]]
-	--[[ Use this block if creds.json file is not used,add the client id and secret  ]
-	creds = {
-		client_id = "CLIENT ID STRING",
-		auth_uri = "https://accounts.google.com/o/oauth2/auth",
-		token_uri = "https://accounts.google.com/o/oauth2/token",
-		["auth_provider_x509_cert_url"] = "https://www.googleapis.com/oauth2/v1/certs",
-		client_secret = "CLIENT SECRET STRING",
-		redirect_uris = {
-			"urn:ietf:wg:oauth:2.0:oob",
-			"http://localhost"
-		}
-	}
-	--[ Creds Block ends ]]
 	tokens_file = 'tokens.json',
 }
 oagdrive,msg = oauth2.new(config)
