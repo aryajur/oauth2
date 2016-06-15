@@ -1,3 +1,13 @@
+--[[
+The MIT License (MIT)
+Copyright (c) 2016 Milind Gupta
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+]]
 -- OAuth 2.0 module for Lua 5.2+
 local url = require 'net.url'
 local json = require 'json'
@@ -32,7 +42,7 @@ local M = {}
 package.loaded[...] = M
 _ENV = M		-- Lua 5.2+
 
-_VERSION = "1.15.12.07"
+_VERSION = "1.16.06.15"
 
 local identifier = {}
 
@@ -334,17 +344,20 @@ local function request(self, url, payload, headers, verb)
 	if not self.tokens or not self.tokens.refresh_token then 
 		return nil,"Access token not acquired yet or token not proper. Run obj:aquireToken()"
 	end
+	local updatedToken
 	if not self.tokens.expires or os.time() >= self.tokens.expires	then 
 		-- Token has expired
-		refreshToken(self) 
+		local stat,msg = refreshToken(self)
+		if not stat then
+			return nil,msg
+		end
+		updatedToken = true
 	end
 	--local tmp = "Authorization: "..self.tokens.token_type.." "..self.tokens.access_token
 	headers = headers or {}
 	headers.Authorization = self.tokens.token_type.." "..self.tokens.access_token
-	--table.insert(headers, tmp)
-	--options = options or {}
-	--copyTable(self.config.curl_options, options)
-	return httpRequest(url, payload, headers, verb)
+	local resp,code = httpRequest(url, payload, headers, verb)
+	return resp,code,updatedToken
 end
 
 -- Returns the parsed URL as a table
