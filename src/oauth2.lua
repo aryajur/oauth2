@@ -42,7 +42,7 @@ local M = {}
 package.loaded[...] = M
 _ENV = M		-- Lua 5.2+
 
-_VERSION = "1.16.06.15"
+_VERSION = "1.21.09.29"
 
 local identifier = {}
 
@@ -151,6 +151,8 @@ default = {
 	end
 	if payload and not method then
 		method = "POST"
+	elseif method then
+		method = method:upper()		-- luasocket does not work for lower case method strings (give 400 bad request)
 	end
 	--[[
 	print("URL: ",tostring(uri))
@@ -165,11 +167,14 @@ default = {
 	  source = source,
 	  method = method,
 	  headers = headers,
-	  protocol = "tlsv1",
-	  options = "all",
-	  verify = "none",
-	}	
-	return table.concat(output), code
+	  --protocol = "tlsv1",
+	  --options = "all",
+	  --verify = "none",
+	}
+	if not one then
+		return nil,code
+	end
+	return table.concat(output), code, hdrs
 end
 
 -- Only function using CURL 
@@ -201,16 +206,23 @@ local function curlRequest(url, payload, headers, verb)
 	end
 	local output = {}
 	local code = 0
+	local hdrs = {}
 	c:perform{
 		writefunction = function(data)
 			table.insert(output, data)
 		end,
 		headerfunction = function(data)
+			-- Get te headers
+			local k,v = data:match("^%s*([^%:]+)%s*%:%s*(.-)%s*$")
+			--print("DATA:",data,k,v)
+			if k then
+				hdrs[k:lower()] = v
+			end			
 			-- skip empty lines and other header lines once code is set to a non-100-Continue value
 			if #data <= 2 or not (code == 0 or code == 100) then return end
 			code = tonumber(data:match('^[^ ]+ ([0-9]+) '))
 		end}
-	return table.concat(output), code
+	return table.concat(output), code, hdrs
 end
 
 local httpRequest
@@ -428,7 +440,19 @@ function new(config)
 		config = {},
 		creds = {},
 		acquireToken = acquireToken,
-		request = request
+		request = request,
+		updateToken = function(self)
+			if not self.tokens.expires or os.time() >= self.tokens.expires	then 
+				-- Token has expired
+				local stat,msg = refreshToken(self)
+				if not stat then
+					return nil,msg
+				end
+				return true,true
+			end
+			return true
+		end
+		
 	}
 	setmetatable(obj,identifier)
 	copyTable(config,obj.config)
