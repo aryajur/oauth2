@@ -42,7 +42,7 @@ local M = {}
 package.loaded[...] = M
 _ENV = M		-- Lua 5.2+
 
-_VERSION = "1.21.09.29"
+_VERSION = "1.23.01.17"
 
 local identifier = {}
 
@@ -308,8 +308,8 @@ local function validateConfig(config)
 	if config.access_type and type(config.access_type) ~= "string" then
 		return nil,"The access_type if given should be a string"
 	end
-	if config.approval_prompt and type(config.approval_prompt) ~= "string" then
-		return nil,"The approval_prompt parameter if given should be string."
+	if config.prompt and type(config.prompt) ~= "string" then
+		return nil,"The prompt parameter if given should be string."
 	end
 	return true
 end
@@ -320,7 +320,7 @@ local function updateToken(self,params)
 
 	local content, code = httpRequest(self.config.token_uri or self.config.token_url, params)
 	if code ~= 200 then 
-		return nil,'Bad http response code: '..tostring(code),content
+		return nil,'Bad http response code: '..tostring(code).." Response:"..tostring(content)
 	end
 
 	local resp = json.decode(content)
@@ -353,15 +353,15 @@ local function request(self, url, payload, headers, verb)
 	if getmetatable(self) ~= identifier then
 		return nil,"Invalid OAuth object"
 	end
-	if not self.tokens or not self.tokens.refresh_token then 
-		return nil,"Access token not acquired yet or token not proper. Run obj:aquireToken()"
+	if not self.tokens or not self.tokens.access_token then 
+		return nil,"Access token not acquired yet or token not proper. Run obj:acquireToken()"
 	end
 	local updatedToken
 	if not self.tokens.expires or os.time() >= self.tokens.expires	then 
 		-- Token has expired
 		local stat,msg = refreshToken(self)
 		if not stat then
-			return nil,msg
+			return nil,"Refresh token unsucessful "..tostring(msg)
 		end
 		updatedToken = true
 	end
@@ -382,18 +382,19 @@ local function buildAuthUrl(self,state)
 		scope = self.config.scope,
 		state = state,
 		access_type = self.config.access_type,
-		approval_prompt = self.config.approval_prompt
+		prompt = self.config.prompt
 	}
 	copyTable(tmp, result.query)
 	return result
 end
 
 
-local function acquireToken(self)
+local function acquireToken(self,urlState)
 	if getmetatable(self) ~= identifier then
 		return nil,"Invalid OAuth object"
 	end
-	local url = buildAuthUrl(self,os.time())		-- Returns the parsed URL as a table
+	urlState = urlState or os.time()	-- Note the state is any string used to identify response to which request. See: https://developers.google.com/identity/protocols/oauth2/web-server
+	local url = buildAuthUrl(self,urlState)		-- Returns the parsed URL as a table
 	return {tostring(url),function(code)			-- Function to authorize the token called by passing the code
 		local params = {
 			grant_type = 'authorization_code',
@@ -446,7 +447,7 @@ function new(config)
 				-- Token has expired
 				local stat,msg = refreshToken(self)
 				if not stat then
-					return nil,msg
+					return nil,"Refresh token unsucessful "..tostring(msg)
 				end
 				return true,true
 			end
